@@ -8,29 +8,29 @@ using namespace std;
 
 int main()
 {
-    VideoCapture video("video.mp4");
-    if (!video.isOpened())
+    VideoCapture recorder("video.mp4");
+    if (!recorder.isOpened())
     {
         return -1;
     }
-    Size videoSize = Size((int)video.get(CV_CAP_PROP_FRAME_WIDTH), (int)video.get(CV_CAP_PROP_FRAME_HEIGHT));
+    Size videoSize = Size((int)recorder.get(CV_CAP_PROP_FRAME_WIDTH), (int)recorder.get(CV_CAP_PROP_FRAME_HEIGHT));
     namedWindow("video demo", WINDOW_KEEPRATIO);
-    Mat videoFrame;
+    Mat frame;
 
     while (true)
     {
         //這邊是算一定的時間後截圖
         for(int i=0;i<60;i++){
-            video >> videoFrame;
-            if (videoFrame.empty())
+            recorder >> frame;
+            if (frame.empty())
             {
                 break;
             }
-            imshow("video demo", videoFrame);
+            imshow("video demo", frame);
             waitKey(100);
-            video >> videoFrame;
+            video >> frame;
         }
-        imwrite("picture_to_check.jpg",videoFrame);
+        imwrite("picture_to_check.jpg",frame);
 
     }
 
