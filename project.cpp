@@ -69,6 +69,7 @@ int main()
     namedWindow("Street picture", WINDOW_AUTOSIZE);
     resize(frame, frame, Size(), 0.5, 0.5);
     imshow("Street picture", frame);
+    imwrite("defaultHOGoutcome.jpg", frame);
     waitKey(0);
 
     return 0;
