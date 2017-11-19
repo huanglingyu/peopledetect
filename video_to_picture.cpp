@@ -1,7 +1,7 @@
 
 #include <iostream>
 #include <stdio.h>
-#include </Users/LingYu/Google 雲端硬碟/project/videotopicture/include/opencv.hpp>
+#include <opencv.hpp>
 #include <opencv2/imgcodecs.hpp>
 using namespace cv;
 using namespace std;
@@ -27,8 +27,7 @@ int main()
                 break;
             }
             imshow("video demo", frame);
-            waitKey(100);
-            video >> frame;
+            waitKey(1);
         }
         imwrite("picture_to_check.jpg",frame);
 

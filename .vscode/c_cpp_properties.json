@@ -5,14 +5,17 @@
             "includePath": [
                 "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include/c++/v1",
                 "/usr/local/include",
+                "/usr/local/lib",
                 "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/9.0.0/include",
                 "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include",
                 "${workspaceRoot}",
                 "${workspaceRoot}/include",
                 "${workspaceRoot}/include/opencv",
                 "${workspaceRoot}/include/opencv2",
-                "/Users/LingYu/LastProjectinSchool/opencv-3.3.0"
-             ],
+                "/Users/LingYu/LastProjectinSchool/opencv-3.3.0",
+                "usr/include",
+                "usr/lib"
+            ],
             "defines": [],
             "intelliSenseMode": "clang-x64",
             "browse": {
