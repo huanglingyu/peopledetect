@@ -17,7 +17,6 @@ int main()
     {
         return -1;
     }
-    Size videoSize = Size((int)recorder.get(CV_CAP_PROP_FRAME_WIDTH), (int)recorder.get(CV_CAP_PROP_FRAME_HEIGHT));
     namedWindow("recorder video", WINDOW_KEEPRATIO);
     Mat frame;  //這邊拿來顯示
 
