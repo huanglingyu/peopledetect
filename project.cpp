@@ -10,65 +10,159 @@
 using namespace cv;
 using namespace std;
 
-int main()
+#define ROIpointtop 520
+#define ROIpointbottom 770
+vector<Rect> movingObjects(0);
+
+void playvideo(string str)
 {
-    VideoCapture recorder("video.mp4");
+    //播影片，按空白鍵選擇要辨識的畫面
+    VideoCapture recorder(str); //讀取影片
+    //如果沒有這個影片
     if (!recorder.isOpened())
     {
-        return -1;
+        cout << "can't open " << str << endl;
     }
+    //開一個視窗顯示影像
     namedWindow("recorder video", WINDOW_KEEPRATIO);
-    Mat frame;  //這邊拿來顯示
-
-    while (true)
+    Mat frame;
+    recorder >> frame;
+    bool keepgoing = true;
+    while (keepgoing)
     {
-        //這邊是算一定的時間後截圖
-        for (int i = 0; i < 60; i++)
+        char key = (char)waitKey(30);
+        switch (key)
         {
+        case ' ': //check this point
+            imwrite("background.jpg", frame);
+            imwrite("result1_background.jpg", frame);
+            recorder >> frame;
+            for (int i = 0; i < 10; i++)
+                recorder >> frame;
+            imshow("recorder video", frame);
+            imwrite("checkpic.jpg", frame);
+            imwrite("result2_checkpic.jpg", frame);
+            keepgoing = false;
+            break;
+
+        default:
             recorder >> frame;
             if (frame.empty())
             {
+                destroyWindow("recorder video");
                 break;
             }
             imshow("recorder video", frame);
-            waitKey(1);
         }
-        imwrite("picture_to_check.jpg", frame);
-        destroyWindow("recorder video");
-        break;
     }
-    frame = imread("picture_to_check.jpg");
-    cvtColor(frame, frame, CV_RGB2GRAY);
-
-    HOGDescriptor hog;
-
-    hog.setSVMDetector(HOGDescriptor::getDefaultPeopleDetector());
-    vector<Rect> found, found_filtered;
-    hog.detectMultiScale(frame, found, 0, Size(8, 8), Size(128, 128), 1.05, 2);
-
-    size_t i, j;
-    for (i = 0; i < found.size(); i++)
+    destroyWindow("recorder video");
+}
+void findmovingthings()
+{
+    Mat img_back, img_check, img_moving, img_threshold;
+    //把兩個灰色圖片相減
+    img_back = imread("background.jpg", IMREAD_GRAYSCALE);
+    img_check = imread("checkpic.jpg", IMREAD_GRAYSCALE);
+    absdiff(img_back, img_check, img_moving);
+    imshow("moving", img_moving);
+    imwrite("movingstuff.jpg", img_moving);
+    imwrite("result3_moving.jpg", img_moving);
+    //做二值化
+    threshold(img_moving, img_threshold, 20, 255, THRESH_BINARY);
+    blur(img_threshold, img_threshold, Size(25, 25));
+    imwrite("afterthreshold.jpg", img_threshold);
+    imwrite("result4_movingafterthreshold.jpg", img_threshold);
+    //找出白色的地方用rect匡出來
+    vector<vector<Point> > contours;
+    findContours(img_threshold, contours, RETR_LIST, CHAIN_APPROX_SIMPLE);
+    img_back = imread("background.jpg");
+    img_moving = imread("background.jpg");
+    int j = 0;
+    for (int i = 0; i < contours.size(); i++)
     {
-        Rect r = found[i];
-        for (j = 0; j < found.size(); j++)
-            if (j != i && (r & found[j]) == r)
-                break;
-        if (j == found.size())
-            found_filtered.push_back(r);
+        Rect rec = boundingRect(contours[i]);
+        rectangle(img_moving, rec, Scalar(255, 255, 255), 3);
+        //看每個rect的右下角，是否在斑馬線範圍內
+        if (rec.br().y >= ROIpointtop && rec.br().y < ROIpointbottom && (rec.br().x - rec.tl().x > 63 || rec.br().y - rec.tl().y > 127))
+        {
+            movingObjects.push_back(rec);
+            rectangle(img_back, rec, Scalar(255, 255, 255), 3);
+            cout << movingObjects[j] << endl;
+            j++;
+        }
     }
-    for (i = 0; i < found_filtered.size(); i++)
+    imwrite("result5_movingObject框出.jpg", img_back);
+    imwrite("result5.0_還沒判斷條件前匡出來的東西.jpg", img_moving);
+}
+
+int main()
+{
+
+    //播影片
+    playvideo("testing_video/realcamera_daytime.mov");
+
+    //把兩個圖片做處理找出我們要偵測的地方
+    findmovingthings();
+
+    // OpenCV's HOG based Pedestrian Detector
+    HOGDescriptor hogDefault(
+        Size(64, 128), //winSize
+        Size(16, 16),  //blocksize
+        Size(8, 8),    //blockStride,
+        Size(8, 8),    //cellSize,
+        9,             //nbins,
+        0,             //derivAperture,
+        -1,            //winSigma,
+        0,             //histogramNormType,
+        0.2,           //L2HysThresh,
+        1,             //gammal correction,
+        64,            //nlevels=64
+        0);            //signedGradient
+
+    // Set the people detector.
+    vector<float> svmDetectorDefault = hogDefault.getDefaultPeopleDetector();
+    hogDefault.setSVMDetector(svmDetectorDefault);
+
+    vector<Rect> bboxes;
+    vector<double> weights;
+
+    float hitThreshold = 1.0;
+    Size winStride = Size(8, 8);
+    Size padding = Size(32, 32);
+    float scale = 1.05;
+    float finalThreshold = 2;
+    bool useMeanshiftGrouping = 0;
+    //判斷是否是人
+    Mat img_back, frame;
+    char str[25];
+    img_back = imread("background.jpg");
+    for (int j = 0; j < movingObjects.size(); j++)
     {
-        Rect r = found_filtered[i];
-        r.x += cvRound(r.width * 0.1);
-        r.width = cvRound(r.width * 0.8);
-        r.y += cvRound(r.height * 0.06);
-        r.height = cvRound(r.height * 0.9);
-        rectangle(frame, r.tl(), r.br(), cv::Scalar(0, 255, 0), 2);
+        //在特定roi判斷有沒有人
+        frame = img_back(movingObjects[j]);
+        hogDefault.detectMultiScale(frame, bboxes, weights, 0, winStride, padding,
+                                    scale, finalThreshold, useMeanshiftGrouping);
+        cout << "here" << endl;
+        if (!bboxes.empty())
+        {
+            vector<Rect>::const_iterator loc = bboxes.begin();
+            vector<Rect>::const_iterator end = bboxes.end();
+            for (; loc != end; ++loc)
+            {
+                rectangle(frame, *loc, Scalar(255, 255, 255), 2);
+            }
+            sprintf(str, "result6_checkframe%1d.jpg", j);
+            imwrite(str, frame);
+            Mat imgROI = img_back(movingObjects[j]); //指定插入的大小和位置
+            addWeighted(imgROI, 0, frame, 1, 0, imgROI);
+            imwrite("result7_addtobackgruond.jpg", img_back);
+        }
+        cout << movingObjects[j] << endl;
     }
-    namedWindow("Street picture", WINDOW_AUTOSIZE);
-    resize(frame, frame, Size(), 0.5, 0.5);
-    imshow("Street picture", frame);
-    imwrite("defaultHOGoutcome.jpg", frame);
+
+    imshow("HOGbigresult", img_back);
+    imwrite("result7_HOGresult.jpg", img_back);
+
     waitKey(0);
 
     return 0;
