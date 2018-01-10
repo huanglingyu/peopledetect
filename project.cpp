@@ -11,7 +11,7 @@ using namespace cv;
 using namespace std;
 
 #define ROIpointtop 520
-#define ROIpointbottom 770
+#define ROIpointbottom 1800
 vector<Rect> movingObjects(0);
 
 void playvideo(string str)
@@ -57,13 +57,15 @@ void playvideo(string str)
     }
     destroyWindow("recorder video");
 }
-void findmovingthings()
+int findmovingthings()
 {
     Mat img_back, img_check, img_moving, img_threshold;
     //把兩個灰色圖片相減
     img_back = imread("background.jpg", IMREAD_GRAYSCALE);
     img_check = imread("checkpic.jpg", IMREAD_GRAYSCALE);
     absdiff(img_back, img_check, img_moving);
+    if(img_moving.data == NULL)
+        return 1;
     imshow("moving", img_moving);
     imwrite("movingstuff.jpg", img_moving);
     imwrite("result3_moving.jpg", img_moving);
@@ -72,6 +74,8 @@ void findmovingthings()
     blur(img_threshold, img_threshold, Size(25, 25));
     imwrite("afterthreshold.jpg", img_threshold);
     imwrite("result4_movingafterthreshold.jpg", img_threshold);
+    if(img_threshold.data == NULL)
+        return 1;
     //找出白色的地方用rect匡出來
     vector<vector<Point> > contours;
     findContours(img_threshold, contours, RETR_LIST, CHAIN_APPROX_SIMPLE);
@@ -83,7 +87,7 @@ void findmovingthings()
         Rect rec = boundingRect(contours[i]);
         rectangle(img_moving, rec, Scalar(255, 255, 255), 3);
         //看每個rect的右下角，是否在斑馬線範圍內
-        if (rec.br().y >= ROIpointtop && rec.br().y < ROIpointbottom && (rec.br().x - rec.tl().x > 63 || rec.br().y - rec.tl().y > 127))
+        if (rec.br().y >= ROIpointtop && rec.br().y < ROIpointbottom && (rec.br().x - rec.tl().x > 63 && rec.br().y - rec.tl().y > 127))
         {
             movingObjects.push_back(rec);
             rectangle(img_back, rec, Scalar(255, 255, 255), 3);
@@ -93,19 +97,26 @@ void findmovingthings()
     }
     imwrite("result5_movingObject框出.jpg", img_back);
     imwrite("result5.0_還沒判斷條件前匡出來的東西.jpg", img_moving);
+    return 0;
 }
 
 int main()
 {
+    Mat img_background;
 
     //播影片
-    playvideo("testing_video/realcamera_daytime.mov");
-
+    playvideo("testing_video/record4.mov"); 
     //把兩個圖片做處理找出我們要偵測的地方
-    findmovingthings();
+    if (findmovingthings() == 1)
+    {
+        cout << "No people detect!"<<endl;
+        img_background = imread("background.jpg");
+        imshow("HOGbigresult", img_background);
+        return 0;
+    } 
 
     // OpenCV's HOG based Pedestrian Detector
-    HOGDescriptor hogDefault(
+/*     HOGDescriptor hogDefault(
         Size(64, 128), //winSize
         Size(16, 16),  //blocksize
         Size(8, 8),    //blockStride,
@@ -121,7 +132,10 @@ int main()
 
     // Set the people detector.
     vector<float> svmDetectorDefault = hogDefault.getDefaultPeopleDetector();
-    hogDefault.setSVMDetector(svmDetectorDefault);
+    hogDefault.setSVMDetector(svmDetectorDefault); */
+
+    HOGDescriptor hogDefault;
+    hogDefault.setSVMDetector(HOGDescriptor::getDefaultPeopleDetector());
 
     vector<Rect> bboxes;
     vector<double> weights;
@@ -133,35 +147,51 @@ int main()
     float finalThreshold = 2;
     bool useMeanshiftGrouping = 0;
     //判斷是否是人
-    Mat img_back, frame;
+    vector<Mat> frame;
     char str[25];
-    img_back = imread("background.jpg");
+    img_background = imread("background.jpg");
+    cout << "successful load background" << endl;
+    int notimes = 0;
     for (int j = 0; j < movingObjects.size(); j++)
     {
+        cout << "successful in forloop" << endl;
         //在特定roi判斷有沒有人
-        frame = img_back(movingObjects[j]);
-        hogDefault.detectMultiScale(frame, bboxes, weights, 0, winStride, padding,
+        frame.push_back(img_background(movingObjects[j]));
+        cout << "successful use roi" << endl;
+        hogDefault.detectMultiScale(frame[j], bboxes, weights, 0, winStride, padding,
                                     scale, finalThreshold, useMeanshiftGrouping);
-        cout << "here" << endl;
+        cout << "successful use hog" << endl;
         if (!bboxes.empty())
         {
             vector<Rect>::const_iterator loc = bboxes.begin();
             vector<Rect>::const_iterator end = bboxes.end();
+            cout << bboxes[0] << endl;
+            cout << bboxes[1] << endl;
+            cout << bboxes[2] << endl;
             for (; loc != end; ++loc)
             {
-                rectangle(frame, *loc, Scalar(255, 255, 255), 2);
+                rectangle(frame[j], *loc, Scalar(255, 255, 255), 2);
+                cout << "draw rectangle" << endl;
             }
             sprintf(str, "result6_checkframe%1d.jpg", j);
-            imwrite(str, frame);
-            Mat imgROI = img_back(movingObjects[j]); //指定插入的大小和位置
-            addWeighted(imgROI, 0, frame, 1, 0, imgROI);
-            imwrite("result7_addtobackgruond.jpg", img_back);
+            imwrite(str, frame[j]);
+            Mat imgROI = img_background(movingObjects[j]); //指定插入的大小和位置
+            addWeighted(imgROI, 0, frame[j], 1, 0, imgROI);
+            imwrite("result7_addtobackgruond.jpg", img_background);
+            cout << "Found people" << endl;
         }
-        cout << movingObjects[j] << endl;
+        else{
+            cout << "No people detect!" << endl;
+            notimes++;
+        }
+        /*         cout << movingObjects[j] << endl; */
+    }
+    if(notimes == movingObjects.size()){
+        cout << "No people detect!" << endl;
     }
 
-    imshow("HOGbigresult", img_back);
-    imwrite("result7_HOGresult.jpg", img_back);
+    imshow("HOGbigresult", img_background);
+    imwrite("result7_HOGresult.jpg", img_background);
 
     waitKey(0);
 
